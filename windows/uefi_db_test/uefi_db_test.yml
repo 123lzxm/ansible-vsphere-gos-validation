@@ -1,0 +1,99 @@
+# Copyright 2021-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for test enable and disable secure boot of VM
+# when VM firmware is EFI and VM hardware version >= 13. The test result
+# will be 'No Run' if VM firmware is BIOS or VM hardware version < 13.
+# Note: For Windows 10 guest OS, if there is non WHQL signed driver installed,
+# enable secure boot will cause OS BSOD.
+#
+- name: uefi_db_test
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - block:
+        - include_tasks: ../setup/test_setup.yml
+        # Get VM firmware info
+        - include_tasks: ../../common/vm_get_boot_info.yml
+
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Secure boot is not supported on VM of {{ guest_os_ansible_distribution }} {{ guest_os_ansible_distribution_ver }} with hardware version {{ vm_hardware_version_num }}"
+            skip_reason: "Not Supported"
+          when: vm_hardware_version_num | int < 13
+
+        - include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: "Skip test case due to VM firmware is not EFI: {{ vm_firmware | default('NA') }}"
+            skip_reason: "Not Applicable"
+          when: vm_firmware is undefined or vm_firmware | lower != 'efi'
+
+        # Shutdown guest OS
+        - include_tasks: ../utils/win_shutdown_restart.yml
+          vars:
+            set_win_power_state: "shutdown"
+
+        # Enable VM secure boot
+        - include_tasks: ../../common/vm_set_boot_options.yml
+          vars:
+            secure_boot_enabled_set: true
+
+        # Power on VM after secure boot enabled
+        - include_tasks: ../../common/vm_set_power_state.yml
+          vars:
+            vm_power_state_set: "powered-on"
+        - include_tasks: ../utils/win_update_inventory.yml
+
+        # Get secure boot status in guest OS
+        - include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: "Confirm-SecureBootUEFI"
+
+        - name: Check secure boot is enabled in guest OS
+          ansible.builtin.assert:
+            that:
+              - not win_powershell_cmd_output.failed
+              - win_powershell_cmd_output.stdout_lines[0] == 'True'
+            msg: "Secure boot enabled status in guest OS: {{ win_powershell_cmd_output.stdout_lines[0] }}"
+
+        # Add registry for secureboot
+        - include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >-
+              Set-ItemProperty -Path “HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot” -Name “AvailableUpdates” -Value 0x40
+
+        - include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >- 
+              Start-ScheduledTask -TaskName "\Microsoft\Windows\PI\Secure-Boot-Update"
+        # restart twice
+        - include_tasks: ../utils/win_shutdown_restart.yml
+          vars:
+            set_win_power_state: "restart"
+        - include_tasks: ../utils/win_shutdown_restart.yml
+          vars:
+            set_win_power_state: "restart"
+        - include_tasks: ../utils/win_update_inventory.yml
+        # check DB is updated
+        - include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >-
+              [System.Text.Encoding]::ASCII.GetString((Get-SecureBootUEFI db).bytes) -match 'Windows UEFI CA 2023'
+        - name: "Verify if DB is updated"
+          ansible.builtin.assert:
+            that:
+              -  not win_powershell_cmd_output.failed
+              -  win_powershell_cmd_output.stdout_lines[0].strip() == "True"
+            fail_msg: "DB is not updated"
+
+        - name: "Get guest OS version build"
+          include_tasks: ../utils/win_get_os_version.yml
+
+        - name: "Take snapshot for DB update"
+          include_tasks: ../../common/vm_take_snapshot.yml
+          vars:
+            snapshot_name: "UEFI_DB_Updated"
+            snapshot_description: "{{ win_os_version_build }}"
+      rescue:
+        - include_tasks: ../../common/test_rescue.yml
