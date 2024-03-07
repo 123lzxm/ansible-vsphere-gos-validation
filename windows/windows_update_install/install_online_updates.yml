@@ -55,6 +55,11 @@
     - win_online_updates_succeed
     - win_online_updates_installed
   block:
+    - name: "Disable OS sleep"
+      include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "powercfg /change monitor-timeout-ac 0; powercfg /change disk-timeout-ac 0; powercfg /change standby-timeout-ac 0; powercfg /change hibernate-timeout-ac 0;"
+
     - name: "Get guest OS version build"
       include_tasks: ../utils/win_get_os_version.yml
     - name: "Display the guest OS version build after installing Windows online updates"
