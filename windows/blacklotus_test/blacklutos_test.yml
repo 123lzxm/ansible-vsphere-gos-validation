@@ -1,0 +1,52 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This case is to test Microsoft's Windows updates.
+#
+- name: blacklotus_test
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_current_test_folder: true
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case due to secure boot is not applicable for BIOS.
+            skip_reason: "Not Applicable"
+          when: firmware | lower == "bios"
+
+        - name: "Enable secure boot DBX and CI boot policy"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >- 
+              reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Secureboot /v AvailableUpdates /t REG_DWORD /d 0x30 /f
+
+        - name: "Restart guest OS"
+          include_tasks: ../utils/win_shutdown_restart.yml
+          vars:
+            set_win_power_state: "restart"
+
+        - name: "Pause 5 minutes"
+          ansible.builtin.pause:
+            seconds: 300
+
+        - name: "Restart guest OS again"
+          include_tasks: ../utils/win_shutdown_restart.yml
+          vars:
+            set_win_power_state: "restart"
+
+        # Verify the revocation list are applied. Get event ID 1035 and 276
+
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+          vars:
+            exit_testing_when_fail: true
