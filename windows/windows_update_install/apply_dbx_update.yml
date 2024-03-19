@@ -1,0 +1,59 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Get VM boot info"
+  include_tasks: ../../common/vm_get_boot_info.yml
+- name: "Enable Secure boot"
+  include_tasks: ../secureboot_enable_disable/change_secureboot_config.yml
+  vars:
+    change_secureboot: 'enable'
+  when:
+    - vm_secureboot_enabled is defined
+    - not vm_secureboot_enabled | bool
+
+- name: "Enable secure boot DBX and CI boot policy"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >- 
+      reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Secureboot /v AvailableUpdates /t REG_DWORD /d 0x30 /f
+
+- name: "Restart guest OS"
+  include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+
+- name: "Pause 5 minutes"
+  ansible.builtin.pause:
+    seconds: 300
+
+- name: "Restart guest OS again"
+  include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+
+# Verify the revocation list are applied. Get event ID 1035 and 276
+- name: "Get event ID 1035"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-WinEvent -LogName System | Where-Object {$_.ID -eq 1035}"
+
+- name: "Check if event ID 1035 is logged"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.stdout_lines is defined
+      - win_powershell_cmd_output.stdout_lines | length > 0
+    fail_msg: "Event ID 1035 is not logged"
+    success_msg: "Event ID 1035 is logged and the DBX update has been applied to the firmware successfully"
+
+- name: "Get event ID 276"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-WinEvent -LogName Microsoft-Windows-Kernel-Boot/Operational | Where-Object {$_.ID -eq 276}"
+
+- name: "Check if event ID 276 is logged"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.stdout_lines is defined
+      - win_powershell_cmd_output.stdout_lines | length > 0
+    fail_msg: "Event ID 276 is not logged"
+    success_msg: "Event ID 1035 is logged and the boot manager loads the SKUSIPolicy.p7b successfully"
