@@ -19,6 +19,10 @@
           vars:
             create_current_test_folder: true
 
+        - name: "Apply the DBX update"
+          include_tasks: apply_dbx_update.yml
+          when: vm_firmware | lower == "efi"
+
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
           vars:
