@@ -50,6 +50,10 @@
         - name: "Install the .msu file of type LCU"
           include_tasks: install_msu_file.yml
 
+        - name: "Apply the DBX update"
+          include_tasks: apply_dbx_update.yml
+          when: vm_firmware | lower == "efi"
+
         - name: "Get guest OS version after installing the .msu file"
           include_tasks: ../utils/win_get_os_version.yml
         - name: "Display the guest OS version build after installing the .msu file"
