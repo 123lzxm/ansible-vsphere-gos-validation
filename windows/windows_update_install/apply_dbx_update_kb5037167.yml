@@ -1,0 +1,37 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Set the registry key to place the revocation for PCA2011 in DBX"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >- 
+      reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Secureboot /v AvailableUpdates /t REG_DWORD /d 0x80 /f
+
+- name: "Restart guest OS"
+  include_tasks: restart_os_twice.yml
+
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      [System.Text.Encoding]::ASCII.GetString((Get-SecureBootUEFI dbx).bytes) -match 'Microsoft Windows Production PCA 2011'
+
+- name: "Verify if DBX is updated"
+  ansible.builtin.assert:
+    that:
+      -  not win_powershell_cmd_output.failed
+      -  win_powershell_cmd_output.stdout_lines[0].strip() == "True"
+    fail_msg: "DBX is not updated"
+
+# Verify the revocation list are applied. Get event ID 1037
+- name: "Get event ID 1037"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Get-WinEvent -LogName System | Where-Object {$_.ID -eq 1037}"
+
+- name: "Check if event ID 1037 is logged"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.stdout_lines is defined
+      - win_powershell_cmd_output.stdout_lines | length > 0
+    fail_msg: "Event ID 1037 is not logged"
+    success_msg: "Event ID 1037 is logged and the DBX update has been applied to the firmware successfully"

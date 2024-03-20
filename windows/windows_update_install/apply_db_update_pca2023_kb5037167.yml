@@ -1,0 +1,23 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Update the db to allow for the PCA2023-signed boot manager"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Secureboot /v AvailableUpdates /t REG_DWORD /d 0x40 /f
+
+- name: "Restart guest OS"
+  include_tasks: restart_os_twice.yml
+
+- include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      [System.Text.Encoding]::ASCII.GetString((Get-SecureBootUEFI db).bytes) -match 'Windows UEFI CA 2023'
+
+- name: "Verify if DB is updated"
+  ansible.builtin.assert:
+    that:
+      -  not win_powershell_cmd_output.failed
+      -  win_powershell_cmd_output.stdout_lines[0].strip() == "True"
+    fail_msg: "DB is not updated"
