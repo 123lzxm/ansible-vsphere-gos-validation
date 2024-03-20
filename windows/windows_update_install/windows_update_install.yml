@@ -19,10 +19,6 @@
           vars:
             create_current_test_folder: true
 
-        - name: "Apply the DBX update"
-          include_tasks: apply_dbx_update.yml
-          when: vm_firmware | lower == "efi"
-
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
           vars:
@@ -55,7 +51,7 @@
           include_tasks: install_msu_file.yml
 
         - name: "Apply the DBX update"
-          include_tasks: apply_dbx_update.yml
+          include_tasks: test_black_lotus.yml
           when: vm_firmware | lower == "efi"
 
         - name: "Get guest OS version after installing the .msu file"
