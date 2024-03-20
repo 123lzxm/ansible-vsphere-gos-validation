@@ -1,0 +1,33 @@
+# Copyright 2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+- name: "Add registry to download and install the PCA2023-signed boot manager"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Secureboot /v AvailableUpdates /t REG_DWORD /d 0x100 /f
+
+- name: "Restart guest OS"
+  include_tasks: restart_os_twice.yml
+
+- name: "Mount EFI partition"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "mountvol s: /s"
+
+- name: "Check if bootmgfw.efi is signed by PCA2023"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      mountvol s: /s
+      $cert = (Get-AuthenticodeSignature -FilePath s:\efi\microsoft\boot\bootmgfw.efi).SignerCertificate
+      $chain = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Chain
+      $chain.Build($cert)
+      $chain.ChainElements | ForEach-Object {$_.Certificate} | Where-Object {$_.Subject -Match "Windows UEFI CA 2023"}
+
+- name: "Verify if bootmgfw.efi is signed by PCA2023"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.stdout_lines is defined
+      - win_powershell_cmd_output.stdout_lines | length > 0
+    fail_msg: "Not found CN values with Windows EFI CA2 023"
