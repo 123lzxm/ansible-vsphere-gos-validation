@@ -1,6 +1,13 @@
 # Copyright 2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
+- name: "Check if the old dbx has PCA 2011"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      [System.Text.Encoding]::ASCII.GetString((Get-SecureBootUEFI dbx).bytes) -match 'Microsoft Windows Production PCA 2011'
+    win_execute_cmd_ignore_error: true
+
 - name: "Set the registry key to place the revocation for PCA2011 in DBX"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
@@ -10,7 +17,8 @@
 - name: "Restart guest OS"
   include_tasks: restart_os_twice.yml
 
-- include_tasks: ../utils/win_execute_cmd.yml
+- name: "Check if the dbx has PCA 2011"
+  include_tasks: ../utils/win_execute_cmd.yml
   vars:
     win_powershell_cmd: >-
       [System.Text.Encoding]::ASCII.GetString((Get-SecureBootUEFI dbx).bytes) -match 'Microsoft Windows Production PCA 2011'
