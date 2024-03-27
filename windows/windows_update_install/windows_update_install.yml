@@ -60,10 +60,29 @@
           ansible.builtin.debug:
             msg: "After installing the .msu file, guest OS version build is {{ win_os_version_build }}"
 
-        - name: "Reset base snapshot after installing the .msu file"
-          include_tasks: ../../common/reset_base_snapshot.yml
+#        - name: "Reset base snapshot after installing the .msu file"
+#          include_tasks: ../../common/reset_base_snapshot.yml
+#          vars:
+#              base_snapshot_description: "{{ win_os_version_build }}"
+
+        # For black lotus test only.
+        - name: "Set new name for base snapshot"
+          ansible.builtin.set_fact:
+            old_snapshot_new_name: "{{ base_snapshot_name }}-{{ current_test_timestamp }}"
+            new_base_snapshot_temp_name: ""
+
+        - name: "Rename current base snapshot to {{ old_snapshot_new_name }}"
+          include_tasks: ../../common/vm_rename_snapshot.yml
           vars:
-              base_snapshot_description: "{{ win_os_version_build }}"
+            current_snapshot_name: "{{ base_snapshot_name }}"
+            new_snapshot_name: "{{ old_snapshot_new_name }}"
+
+        - name: "Take a new snapshot as base snapshot"
+          include_tasks: ../../common/vm_take_snapshot.yml
+          vars:
+            snapshot_name: "{{ base_snapshot_name }}"
+            snapshot_description: "{{ base_snapshot_description | default('') }}"
+
         - name: "Save the new name of the old base snapshot"
           ansible.builtin.set_fact:
             win_update_snapshot_name: "{{ old_snapshot_new_name }}"
