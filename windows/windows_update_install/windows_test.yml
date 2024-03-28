@@ -16,80 +16,38 @@
           vars:
             create_current_test_folder: true
 
-        - name: "Take snapshot after installing new boot manager"
-          include_tasks: ../../common/vm_take_snapshot.yml
-          vars:
-            snapshot_name: "PCA2023SignedBootmgfw"
-            snapshot_description: "New bootmgfw.efi signed by PCA2023 is installed"
-
-        - name: "Get guest OS version after installing the .msu file"
-          include_tasks: ../utils/win_get_os_version.yml
-        - name: "Display the guest OS version build after installing the .msu file"
-          ansible.builtin.debug:
-            msg: "After installing the .msu file, guest OS version build is {{ win_os_version_build }}"
-
-#        - name: "Reset base snapshot after installing the .msu file"
-#          include_tasks: ../../common/reset_base_snapshot.yml
-#          vars:
-#              base_snapshot_description: "{{ win_os_version_build }}"
-
-        # For black lotus test only.
-        - name: "Set new name for base snapshot"
+        - name: "Set path for copied new boot manager and snapshot name"
           ansible.builtin.set_fact:
-            old_snapshot_new_name: "{{ base_snapshot_name }}-{{ current_test_timestamp }}"
-            new_base_snapshot_temp_name: "BaseSnapshotTemp"
-
-        - name: "Take a new snapshot as base snapshot"
-          include_tasks: ../../common/vm_take_snapshot.yml
-          vars:
-            snapshot_name: "{{ new_base_snapshot_temp_name }}"
-            snapshot_description: "{{ win_os_version_build | default('') }}"
+            new_bootmgfw_path: "c:\\bootmgfw_2023.efi"
+            snapshot_name_for_pca2023: "PCA2023SignedBootmgfw"
 
         - name: "Revert to original base snapshot"
           include_tasks: ../../common/vm_revert_snapshot.yml
           vars:
-            snapshot_name: "{{ base_snapshot_name }}"
+            snapshot_name: "{{ snapshot_name_for_pca2023 }}"
 
-        - name: "Rename original base snapshot to {{ old_snapshot_new_name }}"
-          include_tasks: ../../common/vm_rename_snapshot.yml
+        - name: "Copy sigcheck tools to guest OS"
+          ansible.builtin.copy:
+            src: ./sigcheck
+            dest: "C:\\"
+          delegate_to: "{{ vm_guest_ip }}"
+
+        - name: "Get digital signature info of {{ new_bootmgfw_path }} by sigcheck"
+          include_tasks: ../utils/win_execute_cmd.yml
           vars:
-            current_snapshot_name: "{{ base_snapshot_name }}"
-            new_snapshot_name: "{{ old_snapshot_new_name }}"
+            win_powershell_cmd: >-
+              C:\sigcheck\sigcheck.exe -accepteula -i {{ new_bootmgfw_path }}| find "Windows UEFI CA 2023"
+            win_execute_cmd_ignore_error: true
 
-        - name: "Revert to new base snapshot"
-          include_tasks: ../../common/vm_revert_snapshot.yml
-          vars:
-            snapshot_name: "{{ new_base_snapshot_temp_name }}"
-
-        - name: "Rename new base snapshot to {{ base_snapshot_name }}"
-          include_tasks: ../../common/vm_rename_snapshot.yml
-          vars:
-            current_snapshot_name: "{{ new_base_snapshot_temp_name }}"
-            new_snapshot_name: "{{ base_snapshot_name }}"
-
-        - name: "Save the new name of the old base snapshot"
-          ansible.builtin.set_fact:
-            win_update_snapshot_name: "{{ old_snapshot_new_name }}"
+        - name: "Check if {{ new_bootmgfw_path }} is sighed with PCA2023"
+          ansible.builtin.assert:
+            that:
+              - win_powershell_cmd_output.stdout_lines is defined
+              - win_powershell_cmd_output.stdout_lines | length != 0
+            fail_msg: "{{ new_bootmgfw_path }} is not sighed with PCA2023"
+            success_msg: "{{ new_bootmgfw_path }} is sighed with PCA2023"
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
           vars:
             exit_testing_when_fail: true
-      always:
-        - name: "Delete the .msu file from guest OS"
-          when:
-            - msu_file_dest_path is defined
-            - msu_file_dest_path
-          block:
-            - name: "Check if the .msu file exists in guest OS"
-              include_tasks: ../utils/win_check_file_exist.yml
-              vars:
-                win_check_file_exist_file: "{{ msu_file_dest_path }}"
-
-            - name: "Delete the .msu file from guest OS"
-              ansible.windows.win_file:
-                path: "{{ msu_file_dest_path }}"
-                state: absent
-              delegate_to: "{{ vm_guest_ip }}"
-              register: delete_file_result
-              when: win_check_file_exist_result
