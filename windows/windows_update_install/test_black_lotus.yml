@@ -11,8 +11,8 @@
     - vm_secureboot_enabled is defined
     - not vm_secureboot_enabled | bool
 
-- name: "Apply DBX update according to KB5025885"
-  include_tasks: apply_dbx_update_kb5025885.yml
+#- name: "Apply DBX update according to KB5025885"
+#  include_tasks: apply_dbx_update_kb5025885.yml
 
 - name: "Update DB PCA2023"
   include_tasks: apply_db_update_pca2023_kb5037167.yml
