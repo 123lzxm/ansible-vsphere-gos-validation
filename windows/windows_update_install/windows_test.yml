@@ -23,8 +23,8 @@
         - name: "Take snapshot for blacklotus test"
           include_tasks: ../../common/vm_take_snapshot.yml
           vars:
-          snapshot_name: "{{ snapshot_for_blacklotus }}"
-          snapshot_description: "Test completed for BlackLotus"
+            snapshot_name: "snapshot_for_blacklotus"
+            snapshot_description: "Test completed for BlackLotus"
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
