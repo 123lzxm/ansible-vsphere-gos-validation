@@ -16,15 +16,10 @@
           vars:
             create_current_test_folder: true
 
-        - name: "Apply the DBX update"
-          include_tasks: test_black_lotus.yml
-          when: vm_firmware | lower == "efi"
-
-        - name: "Take snapshot for blacklotus test"
-          include_tasks: ../../common/vm_take_snapshot.yml
+        - name: "Remove snapshot"
+          include_tasks: ../../common/vm_remove_snapshot.yml
           vars:
-            snapshot_name: "snapshot_for_blacklotus"
-            snapshot_description: "Test completed for BlackLotus"
+            snapshot_name: "PCA2023SignedBootmgfw"
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
