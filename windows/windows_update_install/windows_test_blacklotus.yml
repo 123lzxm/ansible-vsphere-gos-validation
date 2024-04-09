@@ -16,10 +16,8 @@
           vars:
             create_current_test_folder: true
 
-        - name: "Remove snapshot"
-          include_tasks: ../../common/vm_remove_snapshot.yml
-          vars:
-            snapshot_name: "PCA2023SignedBootmgfw"
+        - name: "Test black lotus"
+          include_tasks: test_black_lotus.yml
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
