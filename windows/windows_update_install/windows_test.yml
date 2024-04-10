@@ -11,66 +11,12 @@
   tasks:
     - name: "Test case block"
       block:
-        - name: "Test setup"
-          include_tasks: ../setup/test_setup.yml
-          vars:
-            create_current_test_folder: true
-
-        - name: "Set mount command for accessing the shared folder"
+        - name: "Set the .msu file name"
           ansible.builtin.set_fact:
-            win_nfs_mount_cmd: |-
-              {%- if windows_nfs_username is defined and windows_nfs_username and 
-                windows_nfs_password is defined and windows_nfs_password -%}
-              {{ 'net use T: ' ~ windows_nfs_share ~ ' ' ~ windows_nfs_password ~ ' /user:' ~ windows_nfs_username }}
-              {%- else -%}
-              {{ 'net use T: ' ~ windows_nfs_share }}
-              {%- endif -%}
-          no_log: "{{ hide_secrets | default(false) }}"
-
-        - name: "Set facts to install SSU"
+            msu_file_path: "C:\\msu\\SSU\\windows10.0-kb5037016-x64-V1.004.msu"
+        - name: "Get file base name"
           ansible.builtin.set_fact:
-            msu_file_name: "windows10.0-kb5037016-x64-V1.004.msu"
-            msu_dir_path: "C:"
-            msu_file_src_path: "T:\\Windows\\Windows10v1607andWindowsServer2016\\SSU\\windows10.0-kb5037016-x64-V1.004.msu"
-
-        - name: "Copy the SSU file to local disk of guest OS"
-          include_tasks: ../utils/win_execute_cmd.yml
-          vars:
-            win_powershell_cmd: >-
-              {{ win_nfs_mount_cmd }};
-              Copy-Item -Path {{ msu_file_src_path }} -Destination {{ msu_dir_path }}  -ErrorAction Stop;
-              net use T: /delete
-            win_execute_cmd_no_log: "{{ hide_secrets | default(false) }}"
-
-        - name: "Install the SSU file"
-          include_tasks: install_msu_file.yml
-
-        - name: "Set facts to install LCU"
-          ansible.builtin.set_fact:
-            msu_file_name: "windows10.0-kb5036899-x64-V1.023.msu"
-            msu_file_src_path: "T:\\Windows\\Windows10v1607andWindowsServer2016\\LCU\\windows10.0-kb5036899-x64-V1.023.msu"
-
-        - name: "Copy the LCU file to local disk of guest OS"
-          include_tasks: ../utils/win_execute_cmd.yml
-          vars:
-            win_powershell_cmd: >-
-              {{ win_nfs_mount_cmd }};
-              Copy-Item -Path {{ msu_file_src_path }} -Destination {{ msu_dir_path }}  -ErrorAction Stop;
-              net use T: /delete
-            win_execute_cmd_no_log: "{{ hide_secrets | default(false) }}"
-
-        - name: "Install the LCU file"
-          include_tasks: install_msu_file.yml
-
-        - name: "Apply the DBX update"
-          include_tasks: test_black_lotus.yml
-          when: vm_firmware | lower == "efi"
-
-        - name: "Take snapshot for blacklotus test"
-          include_tasks: ../../common/vm_take_snapshot.yml
-          vars:
-            snapshot_name: "snapshot_for_blacklotus"
-            snapshot_description: "Test completed for BlackLotus"
+            msu_file_name: "{{ msu_file_path | win_basename }}"
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
