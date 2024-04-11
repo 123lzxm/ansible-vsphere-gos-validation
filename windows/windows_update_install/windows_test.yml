@@ -1,0 +1,68 @@
+# Copyright 2023-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This case is to test Microsoft's Windows updates.
+#   Install Windows .msu update package.
+#   There are two types of .msu file. One is SSU(Servicing Stack Update), the other is LCU(Latest Cumulative Update).
+#   SSU is not always offered. If it's offered, install the SSU firstly.
+#   LCU contains the security update which should always be offered.
+#
+- name: windows_test
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_current_test_folder: true
+        - name: "Set the fact of Windows Update Service name"
+          ansible.builtin.set_fact:
+            wu_service_name: "wuauserv"
+
+        - name: "Set service startup mode to auto and ensure it is started"
+          ansible.windows.win_service:
+            name: "{[ wu_service_name }}"
+            start_mode: auto
+            state: started
+          delegate_to: "{{ vm_guest_ip }}"
+          register: start_service_result
+
+        - name: "Get {[ wu_service_name }} status in Windows guest OS"
+          include_tasks: ../utils/win_get_service_status.yml
+          vars:
+            win_service_name: "{[ wu_service_name }}"
+        - name: "Verify {[ wu_service_name }} is running"
+          ansible.builtin.assert:
+            that:
+              - service_status == "Running"
+            fail_msg: "{[ wu_service_name }} Service is not running in guest OS."
+            success_msg: "{[ wu_service_name }} service is running in guest OS."
+
+        - name: "Get guest OS version after installing the .msu file"
+          include_tasks: ../utils/win_get_os_version.yml
+        - name: "Display the guest OS version build"
+          ansible.builtin.debug:
+            msg: "Guest OS version build is {{ win_os_version_build }}"
+
+        - name: "Reset the base snapshot and remove the old one"
+          include_tasks: ../../common/reset_base_snapshot.yml
+          vars:
+            remove_old_base_snapshot: true
+            base_snapshot_description: "{{ win_os_version_build }}"
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+          vars:
+            exit_testing_when_fail: true
+      always:
+        - name: "Delete the .msu file from guest OS"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: "Get-ChildItem -Path {{ msu_root_dir }} -Include *.msu -Recurse | Remove-Item"
+            win_execute_cmd_ignore_error: true
+          when:
+            - msu_root_dir is defined
+            - msu_root_dir
