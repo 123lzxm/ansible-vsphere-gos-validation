@@ -24,22 +24,22 @@
 
         - name: "Set service startup mode to auto and ensure it is started"
           ansible.windows.win_service:
-            name: "{[ wu_service_name }}"
+            name: "{{ wu_service_name }}"
             start_mode: auto
             state: started
           delegate_to: "{{ vm_guest_ip }}"
           register: start_service_result
 
-        - name: "Get {[ wu_service_name }} status in Windows guest OS"
+        - name: "Get {{ wu_service_name }} status in Windows guest OS"
           include_tasks: ../utils/win_get_service_status.yml
           vars:
-            win_service_name: "{[ wu_service_name }}"
-        - name: "Verify {[ wu_service_name }} is running"
+            win_service_name: "{{ wu_service_name }}"
+        - name: "Verify {{ wu_service_name }} is running"
           ansible.builtin.assert:
             that:
               - service_status == "Running"
-            fail_msg: "{[ wu_service_name }} Service is not running in guest OS."
-            success_msg: "{[ wu_service_name }} service is running in guest OS."
+            fail_msg: "{{ wu_service_name }} Service is not running in guest OS."
+            success_msg: "{{ wu_service_name }} service is running in guest OS."
 
         - name: "Get guest OS version after installing the .msu file"
           include_tasks: ../utils/win_get_os_version.yml
