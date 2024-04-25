@@ -83,4 +83,6 @@
           register: ovftool_export_result
         - name: "Display the ovftool export template result"
           ansible.builtin.debug: var=ovftool_export_result
+        - name: "Remove cloned VM"
+          include_tasks: ../../common/vm_remove.yml
 
