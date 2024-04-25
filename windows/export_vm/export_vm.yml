@@ -30,11 +30,25 @@
         - device_info_with_label._vimtype is defined
         - device_info_with_label._vimtype == "vim.vm.device.VirtualTPM"
       block:
+        - name: "Set clone VM name"
+          ansible.builtin.set_fact:
+            new_vm_name: "{{ vm_name ~ '_tpm' }}"
         - name: "Clone a new VM from current VM"
           include_tasks: ../../common/vm_clone.yml
           vars:
             parent_vm_name: "{{ vm_name }}"
-            cloned_vm_name: "{{ vm_name ~ '_tpm' }}"
+            cloned_vm_name: "{{ new_vm_name }}"
+
+        - name: "Switch to cloned VM for testing"
+          ansible.builtin.set_fact:
+            vm_name: "{{ new_vm_name }}"
+        - name: "Get cloned VM file path"
+          include_tasks: ../../common/vm_get_config.yml
+          vars:
+            property_list: [ 'config.files.logDirectory' ]
+        - name: "Set fact of the cloned VM file path"
+          ansible.builtin.set_fact:
+            vm_dir_name: "{{ vm_config.config.files.logDirectory.split(']')[-1].strip(' \\/') }}"
 
         - include_tasks: ../../common/vm_add_remove_vtpm.yml
           vars:
