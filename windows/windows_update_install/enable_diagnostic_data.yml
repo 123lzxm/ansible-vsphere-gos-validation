@@ -1,0 +1,73 @@
+# Copyright 2023-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This case is to test Microsoft's Windows updates.
+#   Install Windows .msu update package.
+#   There are two types of .msu file. One is SSU(Servicing Stack Update), the other is LCU(Latest Cumulative Update).
+#   SSU is not always offered. If it's offered, install the SSU firstly.
+#   LCU contains the security update which should always be offered.
+#
+- name: enable_diagnostic_data
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_current_test_folder: true
+
+        - name: "Set facts"
+          ansible.builtin.set_fact:
+            drive_letter_new: "Y"
+            enroll_bat_file_name: "SUVP-PartnerEnroll-VMware.bat"
+            enroll_bat_nfs_path: "Y:\\Tools\\SUVP-PartnerEnroll-VMware.bat"
+            enroll_bat_dest_dir: "C:\\"
+
+        - name: "Set mount command for accessing the shared folder"
+          ansible.builtin.set_fact:
+            win_nfs_mount_cmd: |-
+              {{ 'net use ' ~ drive_letter_new ~ ': ' ~ windows_nfs_share ~ ' ' ~ windows_nfs_password ~ ' /user:' ~ windows_nfs_username }}
+          no_log: "{{ hide_secrets | default(false) }}"
+
+        - name: "Copy the enroll bat file to local disk of guest OS"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_execute_cmd_no_log: "{{ hide_secrets | default(false) }}"
+            win_powershell_cmd: >-
+              {{ win_nfs_mount_cmd }};
+              Copy-Item -Path {{ enroll_bat_nfs_path }} -Destination {{ enroll_bat_dest_dir }} -ErrorAction Stop;
+              net use {{ drive_letter_new }}: /delete;
+
+        - name: "Execute the enroll bat file"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: "{{ enroll_bat_dest_dir }}\\{{enroll_bat_file_name}}"
+
+        - name: Pause for 5 minutes
+          ansible.builtin.pause:
+            minutes: 5
+
+        - name: "Delete the enroll bat file"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: "Remove-Item -Path {{ enroll_bat_dest_dir }}\\{{enroll_bat_file_name}} -Force"
+
+        - name: "Get guest OS version after installing the .msu file"
+          include_tasks: ../utils/win_get_os_version.yml
+        - name: "Display the guest OS version build after installing the .msu file"
+          ansible.builtin.debug:
+            msg: "After installing the .msu file, guest OS version build is {{ win_os_version_build }}"
+
+        - name: "Reset the base snapshot and remove the old one"
+          include_tasks: ../../common/reset_base_snapshot.yml
+          vars:
+            remove_old_base_snapshot: true
+            base_snapshot_description: "{{ win_os_version_build }}"
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+          vars:
+            exit_testing_when_fail: true
