@@ -50,6 +50,36 @@
           ansible.builtin.pause:
             minutes: 5
 
+        - name: "Get registry key value for AllowTelemetry"
+          include_tasks: win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >-
+              Get-ItemPropertyValue -Path "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection" -Name AllowTelemetry;
+
+        - name: "Verify AllowTelemetry value"
+          ansible.builtin.assert:
+            that:
+              - win_powershell_cmd_output.rc == 0
+              - win_powershell_cmd_output.stdout_lines is defined
+              - win_powershell_cmd_output.stdout_lines | length == 1
+              - win_powershell_cmd_output.stdout_lines[0] | int == 3
+            fail_msg: "Value of AllowTelemetry is not 3"
+
+        - name: "Get registry key value for AllowDeviceNameInTelemetry"
+          include_tasks: win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >-
+              Get-ItemPropertyValue -Path "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection" -Name AllowDeviceNameInTelemetry;
+
+        - name: "Verify AllowDeviceNameInTelemetry value"
+          ansible.builtin.assert:
+            that:
+              - win_powershell_cmd_output.rc == 0
+              - win_powershell_cmd_output.stdout_lines is defined
+              - win_powershell_cmd_output.stdout_lines | length == 1
+              - win_powershell_cmd_output.stdout_lines[0] | int == 1
+            fail_msg: "Value of AllowDeviceNameInTelemetry is not 1"
+
         - name: "Delete the enroll bat file"
           include_tasks: ../utils/win_execute_cmd.yml
           vars:
