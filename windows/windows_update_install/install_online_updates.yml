@@ -59,6 +59,10 @@
     - name: "Display the guest OS version build after installing Windows online updates"
       ansible.builtin.debug: var=win_os_version_build
 
+    - include_tasks: ../utils/win_execute_cmd.yml
+      vars:
+        win_powershell_cmd: "powercfg /change monitor-timeout-ac 0; powercfg /change disk-timeout-ac 0; powercfg /change standby-timeout-ac 0; powercfg /change hibernate-timeout-ac 0;"
+
     - name: "Reset the base snapshot and remove the old one"
       include_tasks: ../../common/reset_base_snapshot.yml
       vars:
