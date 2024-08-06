@@ -1,0 +1,88 @@
+# Copyright 2023-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This case is to test Microsoft's Windows updates.
+#   Install Windows .msu update package.
+#   There are two types of .msu file. One is SSU(Servicing Stack Update), the other is LCU(Latest Cumulative Update).
+#   SSU is not always offered. If it's offered, install the SSU firstly.
+#   LCU contains the security update which should always be offered.
+#
+- name: windows_test
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_current_test_folder: true
+
+        # enable secure boot
+        - name: "Get VM boot info"
+          include_tasks: ../../common/vm_get_boot_info.yml
+        - name: "Enable Secure boot"
+          include_tasks: ../secureboot_enable_disable/change_secureboot_config.yml
+          vars:
+            change_secureboot: 'enable'
+          when:
+            - vm_secureboot_enabled is defined
+            - not vm_secureboot_enabled | bool
+
+        # Copy bootmgfw.efi file to say c:\temp\bootmgfw.efi
+        - name: "Set new drive letter"
+          ansible.builtin.set_fact:
+            drive_letter_new: "H"
+        - name: "Set the bootmgfw path on nfs"
+          ansible.builtin.set_fact:
+            bootmgfw_nfs_path: "{{ drive_letter_new }}:\\{{ windows_nfs_msu_path }}\\bootmgfw.efi"
+            bootmgfw_dest_path: "C:\\bootmgfw.efi"
+
+        - name: "Set mount command for accessing the shared folder"
+          ansible.builtin.set_fact:
+            win_nfs_mount_cmd: |-
+              {%- if windows_nfs_username is defined and windows_nfs_username and 
+                windows_nfs_password is defined and windows_nfs_password -%}
+              {{ 'net use ' ~ drive_letter_new ~ ': ' ~ windows_nfs_share ~ ' ' ~ windows_nfs_password ~ ' /user:' ~ windows_nfs_username }}
+              {%- else -%}
+              {{ 'net use ' ~ drive_letter_new ~ ': ' ~ windows_nfs_share }}
+              {%- endif -%}
+          no_log: "{{ hide_secrets | default(false) }}"
+
+        - name: "Copy the .msu file to local disk of guest OS"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_execute_cmd_no_log: "{{ hide_secrets | default(false) }}"
+            win_powershell_cmd: >-
+              {{ win_nfs_mount_cmd }};
+              Copy-Item {{ bootmgfw_nfs_path }} -Destination {{ bootmgfw_dest_path }} -ErrorAction Stop;
+              net use {{ drive_letter_new }}: /delete;
+        - name: "Replace with the new bootmgfw"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >-
+              mountvol s: /s;
+              s:;
+              Copy-Item {{ bootmgfw_dest_path }} -Destination "s:\efi\microsoft\boot" -Force -ErrorAction Stop;
+              Copy-Item {{ bootmgfw_dest_path }} -Destination "s:\efi\boot\bootx64.efi" -Force -ErrorAction Stop;
+
+        - name: "Restart guest OS"
+          include_tasks: ../utils/win_shutdown_restart.yml
+          vars:
+            set_win_power_state: "restart"
+
+        - name: "Pause 5 minutes"
+          ansible.builtin.pause:
+            seconds: 300
+
+        - name: "Restart guest OS again"
+          include_tasks: ../utils/win_shutdown_restart.yml
+          vars:
+            set_win_power_state: "restart"
+
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+          vars:
+            exit_testing_when_fail: true
