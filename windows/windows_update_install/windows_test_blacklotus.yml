@@ -16,8 +16,23 @@
           vars:
             create_current_test_folder: true
 
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case due to known issue for x86 32bit OS.
+            skip_reason: "Skipped"
+          when: guest_os_ansible_architecture == "32-bit"
+
         - name: "Test black lotus"
           include_tasks: test_black_lotus.yml
+
+        - name: "Get guest OS version after installing the .msu file"
+          include_tasks: ../utils/win_get_os_version.yml
+        - name: "Reset base snapshot after applying mitigation for black lotus"
+          include_tasks: ../../common/reset_base_snapshot.yml
+          vars:
+              base_snapshot_description: "{{ win_os_version_build }}"
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
