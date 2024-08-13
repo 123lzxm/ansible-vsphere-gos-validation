@@ -24,6 +24,14 @@
             skip_reason: "Skipped"
           when: guest_os_ansible_architecture == "32-bit"
 
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case due to firmware is BISO which does not support secure boot.
+            skip_reason: "Skipped"
+          when: vm_firmware == 'bios'
+
         - name: "Test black lotus"
           include_tasks: test_black_lotus.yml
 
@@ -32,6 +40,7 @@
         - name: "Reset base snapshot after applying mitigation for black lotus"
           include_tasks: ../../common/reset_base_snapshot.yml
           vars:
+              remove_old_base_snapshot: true
               base_snapshot_description: "{{ win_os_version_build }}"
       rescue:
         - name: "Test case failure"
