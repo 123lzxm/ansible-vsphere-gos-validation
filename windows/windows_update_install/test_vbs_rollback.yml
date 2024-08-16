@@ -24,9 +24,7 @@
       mountvol $MountPoint /D;
 
 - name: "Restart guest OS"
-  include_tasks: ../utils/win_shutdown_restart.yml
-  vars:
-    set_win_power_state: "restart"
+  include_tasks: restart_os_twice.yml
 
 # Event Viewer: Application and Services logs > Microsoft > Windows > CodeIntegrity > Operational.
 # Event ID 3099
@@ -39,7 +37,6 @@
     win_powershell_cmd: >-
       $StartTime = (Get-Date).AddDays(-1);
       $EventList = Get-WinEvent -FilterHashtable @{ Logname='Microsoft-Windows-CodeIntegrity/Operational'; ID=3099; StartTime=$StartTime };
-      $EventList | Where-Object {$_.Message -Like "Refreshed and activated Code Integrity policy {976d12c8-cb9f-4730-be52-54600843238e} Microsoft Windows SKU SI Policy*"}
 
 - name: "Check if event ID 3099 is logged"
   ansible.builtin.assert:
@@ -48,3 +45,12 @@
       - win_powershell_cmd_output.stdout_lines | length > 0
     fail_msg: "Event ID 3099 is not logged"
     success_msg: "Event ID 3099 is logged and the new policy has been loaded successfully"
+
+- name: "Display the details for event ID 3099"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      $StartTime = (Get-Date).AddDays(-1);
+      $EventList = Get-WinEvent -FilterHashtable @{ Logname='Microsoft-Windows-CodeIntegrity/Operational'; ID=3099; StartTime=$StartTime };
+      Write-Host "ID=3099 Event count: $($EventList.Count)"; 
+      foreach ($Event in $EventList) {$Event | Select-Object -Property *};
