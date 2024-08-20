@@ -16,13 +16,13 @@
           vars:
             create_current_test_folder: true
 
-        - name: "Skip test case"
-          include_tasks: ../../common/skip_test_case.yml
-          vars:
-            skip_msg: >-
-              Skip test case due to known issue for x86 32bit OS.
-            skip_reason: "Skipped"
-          when: guest_os_ansible_architecture == "32-bit"
+#        - name: "Skip test case"
+#          include_tasks: ../../common/skip_test_case.yml
+#          vars:
+#            skip_msg: >-
+#              Skip test case due to known issue for x86 32bit OS.
+#            skip_reason: "Skipped"
+#          when: guest_os_ansible_architecture == "32-bit"
 
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
