@@ -116,7 +116,7 @@ vm_name: "CentOS_82_ansible_test"
 vm_username: "root"
 vm_password: "B1gd3m0z"
 # vm_folder: ''
-exported_template_path: "/mnt/gosv-images/OS/windows_suvp_ovf"
+exported_template_path: "/mnt/gosv-images/OS/windows_suvp_ovf_20240906"
 
 # For Windows testing only.
 # The port Windows WinRM will run over, valid value is '5986' or '5985'.
