@@ -1,0 +1,90 @@
+# Copyright 2021-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This playbook is used for exporting VM to OVF
+# template, by default the exported template files
+# will be saved in '/tmp/' folder.
+#
+- name: export_vm
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: "Revert to the base snapshot"
+      include_tasks: ../../common/base_snapshot_check_revert.yml
+    # Check VM power status
+    - include_tasks: ../../common/vm_get_power_state.yml
+    # Power off VM if it's not in poweredOff state
+    - include_tasks: ../utils/shutdown_vm.yml
+      when: vm_power_state_get != "poweredOff"
+    - include_tasks: ../../common/vm_get_device_with_label.yml
+      vars:
+        device_label: 'Virtual TPM'
+    # Please make sure enough disk space in specified path
+    - include_tasks: ../../common/ovf_export.yml
+      vars:
+        ovf_export_dst_path: "{{ exported_template_path | default('/tmp/') }}"
+      when: device_info_with_label is undefined or device_info_with_label == ""
+
+    - name: "Export VM with vTPM device"
+      when:
+        - device_info_with_label is defined
+        - device_info_with_label._vimtype is defined
+        - device_info_with_label._vimtype == "vim.vm.device.VirtualTPM"
+      block:
+        - name: "Set clone VM name"
+          ansible.builtin.set_fact:
+            new_vm_name: "{{ vm_name ~ '_tpm' }}"
+        - name: "Clone a new VM from current VM"
+          include_tasks: ../../common/vm_clone.yml
+          vars:
+            parent_vm_name: "{{ vm_name }}"
+            cloned_vm_name: "{{ new_vm_name }}"
+
+        - name: "Switch to cloned VM for testing"
+          ansible.builtin.set_fact:
+            vm_name: "{{ new_vm_name }}"
+        - name: "Get cloned VM file path"
+          include_tasks: ../../common/vm_get_config.yml
+          vars:
+            property_list: [ 'config.files.logDirectory' ]
+        - name: "Set fact of the cloned VM file path"
+          ansible.builtin.set_fact:
+            vm_dir_name: "{{ vm_config.config.files.logDirectory.split(']')[-1].strip(' \\/') }}"
+
+        - include_tasks: ../../common/vm_add_remove_vtpm.yml
+          vars:
+            vtpm_operation: 'absent'
+        - name: "Check remove vTPM device task"
+          ansible.builtin.assert:
+            that:
+              - vtpm_ops_result is defined
+              - vtpm_ops_result.changed
+            fail_msg: "Remove vTPM device from VM task result is not changed."
+
+        # Download ovftool 4.5.0
+        - name: " L"
+          ansible.builtin.set_fact:
+            ovftool_45_url: http://build-squid.eng.vmware.com/build/mts/release/bora-19996014/publish/VMware-ovftool-4.5.0-19996014-lin.x86_64.zip
+        - name: "Download and extract ovftool package"
+          ansible.builtin.unarchive:
+            src: "{{ ovftool_45_url }}"
+            dest: "{{ local_cache }}"
+            remote_src: yes
+          register: ovftool_unarchive_result
+        - name: "Display the download and extract ovftool result"
+          ansible.builtin.debug: var=ovftool_unarchive_result
+
+        # Use ovftool to export ovf template
+        - name: "Set fact of ovtool export command"
+          ansible.builtin.set_fact:
+            ovftool_export_cmd: "{{ local_cache }}/ovftool/ovftool --noSSLVerify --addDevice:vtpm --X:logFile={{ current_test_log_folder }}/ovftool_export.log vi://{{ vsphere_host_user }}:'{{ vsphere_host_user_password}}'@{{ vsphere_host_name }}/{{ vsphere_host_datacenter }}?ds=[{{ datastore }}]{{ vm_dir_name }}/{{ vm_dir_name }}.vmx {{ exported_template_path }}"
+        - name: "Use ovftool to export template"
+          ansible.builtin.shell:
+            cmd: "{{ ovftool_export_cmd }}"
+          register: ovftool_export_result
+        - name: "Display the ovftool export template result"
+          ansible.builtin.debug: var=ovftool_export_result
+        - name: "Remove cloned VM"
+          include_tasks: ../../common/vm_remove.yml
+
