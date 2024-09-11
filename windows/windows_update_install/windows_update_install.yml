@@ -22,6 +22,13 @@
         - name: "Install the online updates for guest OS"
           include_tasks: install_online_updates.yml
 
+        - name: "Check if online update succeeds"
+          ansible.builtin.assert:
+            that:
+              - win_online_updates_succeed
+            fail_msg: "Windows online update failed."
+            success_msg: "Windows online update succeeds."
+
         - name: "Test passed for online updates"
           ansible.builtin.meta: end_host
 
