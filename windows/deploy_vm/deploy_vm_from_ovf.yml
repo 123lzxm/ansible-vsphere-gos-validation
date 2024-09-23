@@ -1,0 +1,33 @@
+# Copyright 2022-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Deploy a new Windows VM through the Windows OVF/OVA template
+#
+- name: "Update test case name for deploying VM from OVF image"
+  ansible.builtin.set_fact:
+    current_testcase_name: "deploy_vm_ovf"
+
+# OVA file on local machine
+- name: "Get OVA path and file name"
+  ansible.builtin.set_fact:
+    vm_ova_url: "{{ ova_path  }}"
+    vm_ova_name: "{{ ova_path | regex_search('([^/]+\.ovf)$') }}"
+
+- name: "Deploy a new VM from OVA"
+  include_tasks: ../../common/ovf_deploy.yml
+  vars:
+    ovf_url: "{{ vm_ova_url }}"
+    ovf_vm_name: "{{ vm_name }}"
+    deploy_datastore: "{{ datastore }}"
+- name: "Set fact of vm_exists to True"
+  ansible.builtin.set_fact:
+    vm_exists: true
+
+# Get OVA deployed VM info
+- name: "Collect hardware configs of the VM deployed from OVF"
+  include_tasks: ../../common/collect_ovf_vm_config.yml
+  vars:
+    ovf_vm_hardware_config_path: "{{ current_test_log_folder }}"
+
+- name: "Get VM info"
+  include_tasks: ../../common/vm_get_vm_info.yml

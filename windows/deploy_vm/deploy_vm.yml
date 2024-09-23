@@ -25,17 +25,20 @@
 
     - name: "Test case block"
       block:
-        - name: "Deploy VM by creating a new VM and install OS from ISO image on it"
-          include_tasks: deploy_vm_from_iso.yml
-          when: >
-            (vm_deploy_method is undefined) or
-            (vm_deploy_method == 'iso')
+#        - name: "Deploy VM by creating a new VM and install OS from ISO image on it"
+#          include_tasks: deploy_vm_from_iso.yml
+#          when: >
+#            (vm_deploy_method is undefined) or
+#            (vm_deploy_method == 'iso')
+#
+#        - name: "Deploy VM from an OVF template"
+#          include_tasks: deploy_vm_from_ova.yml
+#          when:
+#            - vm_deploy_method is defined
+#            - vm_deploy_method == 'ova'
 
         - name: "Deploy VM from an OVF template"
-          include_tasks: deploy_vm_from_ova.yml
-          when:
-            - vm_deploy_method is defined
-            - vm_deploy_method == 'ova'
+          include_tasks: deploy_vm_from_ovf.yml
 
         - name: "Print VM guest IP address"
           ansible.builtin.debug: var=vm_guest_ip
