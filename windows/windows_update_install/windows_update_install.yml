@@ -14,6 +14,16 @@
   tasks:
     - name: "Test case block"
       block:
+        - name: "Check base snapshot existence and/or revert to it"
+          include_tasks: ../../common/base_snapshot_check_revert.yml
+
+        - name: "Take a base snapshot if it does not exist"
+          include_tasks: create_base_snapshot.yml
+          when: not base_snapshot_exists
+
+        - name: "Test passed"
+          ansible.builtin.meta: end_host
+
         - name: "Test setup"
           include_tasks: ../setup/test_setup.yml
           vars:
