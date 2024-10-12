@@ -1,0 +1,35 @@
+# Copyright 2023-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This case is to test Microsoft's Windows updates.
+#   Install Windows .msu update package.
+- name: windows_basic_config
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Enable and start Microsoft Store Install Service"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >-
+              Set-Service -Name wuauserv -StartupType Automatic; Start-Service wuauserv;
+              Set-Service -Name InstallService -StartupType Automatic; Start-Service InstallService"
+
+        - name: "Disable OS sleep"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >- 
+              powercfg /change monitor-timeout-ac 0; powercfg /change disk-timeout-ac 0; 
+              powercfg /change standby-timeout-ac 0; powercfg /change hibernate-timeout-ac 0;
+
+        - name: "Disable firewall in Windows guest OS"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: "netsh advfirewall set allprofiles state off"
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+          vars:
+            exit_testing_when_fail: true
