@@ -15,7 +15,7 @@
           vars:
             win_powershell_cmd: >-
               Set-Service -Name wuauserv -StartupType Automatic; Start-Service wuauserv;
-              Set-Service -Name InstallService -StartupType Automatic; Start-Service InstallService"
+              Set-Service -Name InstallService -StartupType Automatic; Start-Service InstallService;
 
         - name: "Disable OS sleep"
           include_tasks: ../utils/win_execute_cmd.yml
