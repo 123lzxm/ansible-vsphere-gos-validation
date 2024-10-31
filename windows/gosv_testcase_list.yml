@@ -3,6 +3,7 @@
 ---
 - import_playbook: wintools_complete_install_verify/wintools_complete_install_verify.yml
 - import_playbook: windows_update_install/windows_update_install.yml
+- import_playbook: windows_update_install/windows_online_update_install.yml
 - import_playbook: windows_update_install/windows_basic_config.yml
 - import_playbook: windows_update_install/enable_diagnostic_data.yml
 - import_playbook: uefi_db_test/uefi_db_test.yml

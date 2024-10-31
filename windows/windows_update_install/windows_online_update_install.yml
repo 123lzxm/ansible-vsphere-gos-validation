@@ -1,0 +1,34 @@
+# Copyright 2023-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This case is to install online Windows updates.
+
+- name: windows_online_update_install
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_current_test_folder: true
+
+        - name: "Install the online updates for guest OS"
+          include_tasks: install_online_updates.yml
+
+        - name: "Check if online update succeeds"
+          ansible.builtin.assert:
+            that:
+              - win_online_updates_succeed
+            fail_msg: "Windows online update failed."
+            success_msg: "Windows online update succeeds."
+
+        - name: "Test passed for online updates"
+          ansible.builtin.meta: end_host
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+          vars:
+            exit_testing_when_fail: true
