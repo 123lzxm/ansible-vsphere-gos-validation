@@ -11,33 +11,39 @@
     - name: "Test case block"
       block:
         - name: "Set the destination datastore"
-          ansible_builtin_set_fact:
+          ansible.builtin.set_fact:
             dest_datastore: "GOSV-iSCSI-6TB"
 
         - name: "Relocate {{ vm_name }} from datastore {{ datastore }} to datastore {{ dest_datastore }}."
           when: datastore != dest_datastore
-          community.vmware.vmware_vmotion:
-            hostname: '{{ vsphere_host_name }}'
-            username: '{{ vsphere_host_user }}'
-            password: '{{ vsphere_host_user_password }}'
-            vm_name: "{{ vm_name }}"
-            destination_datastore: "{{ dest_datastore }}"
-            validate_certs: false
-          register: vmotion_result
+          block:
+            - name: "Execute vmotion"
+              community.vmware.vmware_vmotion:
+                hostname: '{{ vsphere_host_name }}'
+                username: '{{ vsphere_host_user }}'
+                password: '{{ vsphere_host_user_password }}'
+                vm_name: "{{ vm_name }}"
+                destination_datastore: "{{ dest_datastore }}"
+                validate_certs: false
+              register: vmotion_result
 
-        - name: "Display the result of vmotion"
-          ansible.builtin.debug: var=vmotion_result
+            - name: "Display the result of vmotion"
+              ansible.builtin.debug: var=vmotion_result
 
-        - name: "Get VM info"
-          include_tasks: ../../common/vm_get_vm_info.yml
+            - name: "Get VM info"
+              include_tasks: ../../common/vm_get_vm_info.yml
 
-        - name: "Check if vmotion succeeds"
-          ansible.builtin.assert:
-            that:
-              - datastore == dest_datastore
-            success_msg: "Successfully move VM to new datastore {{ dest_datastore }}"
-            fail_msg: "Failed to move VM to new datastore."
+            - name: "Check if vmotion succeeds"
+              ansible.builtin.assert:
+                that:
+                  - datastore == dest_datastore
+                success_msg: "Successfully move VM to new datastore {{ dest_datastore }}"
+                fail_msg: "Failed to move VM to new datastore."
 
+        - name: "No need to do vmotion"
+          ansible.builtin.debug:
+            msg: " {{ vm_name }} is already in datastore {{ dest_datastore }}. "
+          when: datastore == dest_datastore
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
