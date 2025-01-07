@@ -1,0 +1,71 @@
+# Copyright 2023-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This case is to test a TTR - February 2025 Trusted Roots Update
+#
+- name: windows_test
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_current_test_folder: true
+
+        # Copy the script from the suvp shared folder.
+        - name: "Set the facts of driver letter"
+          ansible.builtin.set_fact:
+            drive_letter_new: "Z"
+
+        - name: "Set the facts of the script file source and destination directory"
+          ansible.builtin.set_fact:
+            ps1_nfs_dir: "{{ drive_letter_new }}:\\{{ windows_nfs_msu_path }}\\Enable-CTLTestUrl.ps1"
+            ps1_dest_dir: "C:\\Enable-CTLTestUrl.ps1"
+
+        - name: "Set mount command for accessing the shared folder"
+          ansible.builtin.set_fact:
+            win_nfs_mount_cmd: |-
+              {%- if windows_nfs_username is defined and windows_nfs_username and 
+                windows_nfs_password is defined and windows_nfs_password -%}
+              {{ 'net use ' ~ drive_letter_new ~ ': ' ~ windows_nfs_share ~ ' ' ~ windows_nfs_password ~ ' /user:' ~ windows_nfs_username }}
+              {%- else -%}
+              {{ 'net use ' ~ drive_letter_new ~ ': ' ~ windows_nfs_share }}
+              {%- endif -%}
+          no_log: "{{ hide_secrets | default(false) }}"
+
+        - name: "Copy Enable-CTLTestUrl.ps1 to local disk of guest OS"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_execute_cmd_no_log: "{{ hide_secrets | default(false) }}"
+            win_powershell_cmd: >-
+              {{ win_nfs_mount_cmd }};
+              Copy-Item -Path {{ ps1_nfs_dir }} -Destination {{ ps1_dest_dir }} -ErrorAction Stop;
+              net use {{ drive_letter_new }}: /delete;
+
+        # execute the script
+        - name: "Updates the device to use the test url and displays the version of the CTL that is available at that url"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >-
+              Set-ExecutionPolicy -ExecutionPolicy Bypass -Force;
+              {{ ps1_dest_dir }};
+
+        - name: "Updates the device to use the default url"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >-
+              Set-ExecutionPolicy -ExecutionPolicy Bypass -Force;
+              {{ ps1_dest_dir }} -Reset
+
+        - name: "Remove the ps1 file"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: "Remove-Item -Path {{ ps1_dest_dir }} -Force"
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+          vars:
+            exit_testing_when_fail: true
