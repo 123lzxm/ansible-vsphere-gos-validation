@@ -71,3 +71,15 @@
   when:
     - not win_online_updates_installed
     - not win_online_updates_succeed
+
+# Check if the Windows Update service wuauserv is running. If not, enable and start it.
+- name: "Get Windows Update service status in guest OS"
+  include_tasks: ../utils/win_get_service_status.yml
+  vars:
+    win_service_name: "wuauserv"
+
+- name: "Enable and start Windows Update service in guest OS"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Set-Service -Name wuauserv -StartupType Automatic; Start-Service -Name wuauserv"
+  when: service_status == "Stopped"
