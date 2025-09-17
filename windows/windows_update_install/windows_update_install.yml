@@ -19,6 +19,35 @@
           vars:
             create_current_test_folder: true
 
+        - name: "Clean up the cached/temp Windows Updates packages"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >-
+              Stop-Service -Name wuauserv,bits,cryptsvc,msiserver -Force;
+              Remove-Item -Path "$env:windir\\SoftwareDistribution\\Download\\*" -Recurse -Force -ErrorAction SilentlyContinue;
+              Remove-Item -Path "$env:windir\\Temp\\*" -Recurse -Force -ErrorAction SilentlyContinue;
+              Remove-Item -Path "$env:TEMP\\*" -Recurse -Force -ErrorAction SilentlyContinue;
+            win_execute_cmd_ignore_error: true
+
+        - name: "Restart the guest OS"
+          include_tasks: ../utils/win_shutdown_restart.yml
+          vars:
+            set_win_power_state: "restart"
+
+        - name: "Get guest OS version build"
+          include_tasks: ../utils/win_get_os_version.yml
+        - name: "Display the guest OS version build after installing Windows online updates"
+          ansible.builtin.debug: var=win_os_version_build
+
+        - name: "Reset the base snapshot and remove the old one"
+          include_tasks: ../../common/reset_base_snapshot.yml
+          vars:
+            remove_old_base_snapshot: true
+            base_snapshot_description: "{{ win_os_version_build }}"
+
+        - name: "Test passed for online updates"
+          ansible.builtin.meta: end_host
+
         - name: "Install the online updates for guest OS"
           include_tasks: install_online_updates.yml
 
@@ -28,9 +57,6 @@
               - win_online_updates_succeed
             fail_msg: "Windows online update failed."
             success_msg: "Windows online update succeeds."
-
-        - name: "Test passed for online updates"
-          ansible.builtin.meta: end_host
 
         - name: "Skip test case"
           include_tasks: ../../common/skip_test_case.yml
