@@ -2,14 +2,19 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This case is to test Microsoft's Windows updates.
-#   Install Windows .msu update package.
+#   This case is to enable windows updates, disable sleep, diable firewall. Then reset the base snapshot.
+#
 - name: windows_basic_config
   hosts: localhost
   gather_facts: no
   tasks:
     - name: "Test case block"
       block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_current_test_folder: true
+
         - name: "Enable and start Microsoft Store Install Service"
           include_tasks: ../utils/win_execute_cmd.yml
           vars:
@@ -28,6 +33,11 @@
           include_tasks: ../utils/win_execute_cmd.yml
           vars:
             win_powershell_cmd: "netsh advfirewall set allprofiles state off"
+
+        - name: "Reset the base snapshot and remove the old one"
+          include_tasks: ../../common/reset_base_snapshot.yml
+          vars:
+            remove_old_base_snapshot: true
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml
