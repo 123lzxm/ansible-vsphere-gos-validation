@@ -30,7 +30,7 @@
       -  win_powershell_cmd_output.stdout_lines[0].strip() == "True"
     fail_msg: "DBX is not updated"
 
-# Verify the revocation list are applied. Get event ID 1037
+# Verify the revocation list is applied. Get event ID 1037
 - name: "Get event ID 1037"
   include_tasks: ../utils/win_execute_cmd.yml
   vars:
