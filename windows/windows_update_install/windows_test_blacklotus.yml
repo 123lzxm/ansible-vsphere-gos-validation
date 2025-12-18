@@ -32,6 +32,22 @@
             skip_reason: "Skipped"
           when: vm_firmware == 'bios'
 
+        - name: "Check if the dbx has PCA 2011"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >-
+              [System.Text.Encoding]::ASCII.GetString((Get-SecureBootUEFI dbx).bytes) -match 'Microsoft Windows Production PCA 2011'
+
+        - name: "Skip test case"
+          include_tasks: ../../common/skip_test_case.yml
+          vars:
+            skip_msg: >-
+              Skip test case due to firmware is BISO which does not support secure boot.
+            skip_reason: "Skipped"
+          when:
+            - not win_powershell_cmd_output.failed
+            - win_powershell_cmd_output.stdout_lines[0].strip() == "True"
+
         - name: "Test black lotus"
           include_tasks: test_black_lotus.yml
 
