@@ -2,10 +2,9 @@
 # SPDX-License-Identifier: BSD-2-Clause
 ---
 # Description:
-#   This case is to test Microsoft's Windows updates.
-#   Install Windows .msu update package.
+#   This case is to disable the automatic Windows Update.
 #
-- name: windows_test
+- name: disable_auto_windows_update
   hosts: localhost
   gather_facts: no
   tasks:
