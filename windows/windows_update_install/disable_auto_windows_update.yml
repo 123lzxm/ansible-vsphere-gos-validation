@@ -1,0 +1,74 @@
+# Copyright 2023-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This case is to test Microsoft's Windows updates.
+#   Install Windows .msu update package.
+#
+- name: windows_test
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_current_test_folder: true
+
+        - name: "Wait until Windows Update is idle"
+          ansible.windows.win_shell: |
+            $procs = Get-Process TiWorker,TrustedInstaller,usoclient,wuauclt -ErrorAction SilentlyContinue
+            if ($procs) {
+              Write-Output "Windows Update is busy"
+              exit 1
+            }
+            exit 0
+          register: wu_idle
+          delegate_to: "{{ vm_guest_ip }}"
+          retries: 30
+          delay: 60
+          until: wu_idle.rc == 0
+          changed_when: false
+
+        - name: "Disable automatic Windows Update"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >-
+              reg add "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" /v NoAutoUpdate /t REG_DWORD /d 1 /f
+
+        - name: "Check if reboot is pending"
+          ansible.windows.win_shell: |
+            if (
+              Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending' -or
+              Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired'
+            ) {
+              exit 10
+            }
+            exit 0
+          register: reboot_check
+          delegate_to: "{{ vm_guest_ip }}"
+          changed_when: false
+          failed_when: false
+
+        - name: "Restart guest OS"
+          include_tasks: ../utils/win_shutdown_restart.yml
+          vars:
+            set_win_power_state: "restart"
+          when: reboot_check.rc == 10
+
+        - name: "Get guest OS version build"
+          include_tasks: ../utils/win_get_os_version.yml
+        - name: "Display the guest OS version build after installing Windows online updates"
+          ansible.builtin.debug: var=win_os_version_build
+
+        - name: "Reset the base snapshot and remove the old one"
+          include_tasks: ../../common/reset_base_snapshot.yml
+          vars:
+            remove_old_base_snapshot: true
+            base_snapshot_description: "{{ win_os_version_build }}"
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+          vars:
+            exit_testing_when_fail: true
