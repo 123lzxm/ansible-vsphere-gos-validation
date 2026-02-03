@@ -34,10 +34,36 @@
           vars:
             win_powershell_cmd: "netsh advfirewall set allprofiles state off"
 
+        - name: "Set the registry path for auto logon"
+          ansible.builtin.set_fact:
+            winlogon_path: "HKLM:\\SOFTWARE\\Microsoft\Windows NT\\CurrentVersion\\Winlogon"
+
+        - name: "Enable auto logon"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: >-
+              Set-ItemProperty -Path {{ winlogon_path }} -Name AutoAdminLogon -Value 1;
+              Set-ItemProperty -Path {{ winlogon_path }} -Name DefaultUserName -Value {{ vm_username }};
+              Set-ItemProperty -Path {{ winlogon_path }} -Name DefaultPassword -Value {{ vm_password }};
+
+        - name: "Restart guest OS"
+          include_tasks: ../utils/win_shutdown_restart.yml
+          vars:
+            set_win_power_state: "restart"
+
+        - name: "Disable automatic Windows Update and disable MRST"
+          include_tasks: disable_auto_wu.yml
+
+        - name: "Get guest OS version build"
+          include_tasks: ../utils/win_get_os_version.yml
+        - name: "Display the guest OS version build after installing Windows online updates"
+          ansible.builtin.debug: var=win_os_version_build
+
         - name: "Reset the base snapshot and remove the old one"
           include_tasks: ../../common/reset_base_snapshot.yml
           vars:
             remove_old_base_snapshot: true
+            base_snapshot_description: "{{ win_os_version_build }}"
       rescue:
         - name: "Test case failure"
           include_tasks: ../../common/test_rescue.yml

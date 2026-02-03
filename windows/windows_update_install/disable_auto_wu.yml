@@ -1,0 +1,70 @@
+# Copyright 2023-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This case is to disable the automatic Windows Update.
+
+# MSRT: Microsoft Windows Malicious Software Removal Tool
+- name: "Set the fact of the registry path for disabling auto WU and MSRT"
+  ansible.builtin.set_fact:
+    wu_reg_path: "HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU"
+    wu_reg_name: "NoAutoUpdate"
+    msrt_policy_path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\MRT"
+    msrt_policy_name: "DontOfferThroughWUAU"
+
+- name: "Wait until Windows Update is idle"
+  ansible.windows.win_shell: |-
+    $procs = Get-Process TiWorker,TrustedInstaller,usoclient,wuauclt -ErrorAction SilentlyContinue
+    if ($procs) {
+      Write-Output "Windows Update is busy"
+      exit 1
+    }
+    exit 0
+  register: wu_idle
+  delegate_to: "{{ vm_guest_ip }}"
+  retries: 30
+  delay: 60
+  until: wu_idle.rc == 0
+  changed_when: false
+
+- name: "Check if there are any running WU process"
+  ansible.builtin.assert:
+    that:
+      - wu_idle.rc == 0
+    fail_msg: >-
+        Windows Update is still busy after waiting for 30 minutes.   
+
+- name: "Disable automatic Windows Update and disable MRST"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      if (!(Test-Path {{ wu_reg_path }} )) { New-Item -Path {{ wu_reg_path }} -Force | Out-Null };
+      Set-ItemProperty -Path {{ wu_reg_path }} -Name {{ wu_reg_name }} -Value 1 -Type DWord;
+      if (!(Test-Path {{ msrt_policy_path }} )) { New-Item -Path {{ msrt_policy_path }} -Force | Out-Null };
+      Set-ItemProperty -Path {{ msrt_policy_path }} -Name {{ msrt_policy_name }} -Value 1 -Type DWord;
+
+- name: "Check if reboot is pending"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_execute_cmd_ignore_error: true
+    win_powershell_cmd: |-
+      if (
+        (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') -or
+        (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired')
+      ) {
+        exit 10
+      }
+      exit 0
+
+- name: "Verify the result of checking reboot"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.rc in [0, 10]
+    fail_msg: >-
+        The result code for checking reboot should be in [0,10].
+
+- name: "Restart guest OS"
+  include_tasks: ../utils/win_shutdown_restart.yml
+  vars:
+    set_win_power_state: "restart"
+  when: win_powershell_cmd_output.rc == 10
