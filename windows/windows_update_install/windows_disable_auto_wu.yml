@@ -1,0 +1,35 @@
+# Copyright 2023-2024 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This case is to disable the automatic Windows Update.
+#
+- name: windows_disable_auto_wu
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_current_test_folder: true
+
+        - name: "Disable automatic Windows Update and disable MRST"
+          include_tasks: disable_auto_wu.yml
+
+        - name: "Get guest OS version build"
+          include_tasks: ../utils/win_get_os_version.yml
+        - name: "Display the guest OS version build after installing Windows online updates"
+          ansible.builtin.debug: var=win_os_version_build
+
+        - name: "Reset the base snapshot and remove the old one"
+          include_tasks: ../../common/reset_base_snapshot.yml
+          vars:
+            remove_old_base_snapshot: true
+            base_snapshot_description: "{{ win_os_version_build }}"
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+          vars:
+            exit_testing_when_fail: true
