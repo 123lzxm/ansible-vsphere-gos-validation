@@ -24,6 +24,7 @@
           ansible.builtin.set_fact:
             ps1_nfs_dir: "{{ drive_letter_new }}:\\{{ windows_nfs_msu_path }}\\Enable-CTLTestUrl.ps1"
             ps1_dest_dir: "C:\\Enable-CTLTestUrl.ps1"
+            expected_sequence_number: "1401dcb1ff4bbd2a8b"
 
         - name: "Set mount command for accessing the shared folder"
           ansible.builtin.set_fact:
@@ -52,6 +53,16 @@
             win_powershell_cmd: >-
               Set-ExecutionPolicy -ExecutionPolicy Bypass -Force;
               {{ ps1_dest_dir }};
+
+        - name: "Check the expected SequenceNumber"
+          ansible.builtin.assert:
+            that:
+              - win_powershell_cmd_output.rc is defined
+              - win_powershell_cmd_output.rc == 0
+              - win_powershell_cmd_output.stdout is defined
+              - win_powershell_cmd_output.stdout is search(expected_sequence_number)
+            fail_msg: >-
+              Not found the expected sequence number '{{ expected_sequence_number }}' after applying the new CTL URL. 
 
         - name: "Updates the device to use the default url"
           include_tasks: ../utils/win_execute_cmd.yml
