@@ -1,0 +1,94 @@
+# Copyright 2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Test for the KEK and DB updates.
+# Prepare the OS and collect the OS info before applying the updates.
+- name: "Set the related facts"
+  ansible.builtin.set_fact:
+    script_detect_sb_cert_status: "$env:SystemRoot\\SecureBoot\\ExampleRolloutScripts\\Detect-SecureBootCertUpdateStatus.ps1"
+    sb_cert_status_before: "C:\\sb_cert_status_before.txt"
+    sb_cert_status_after: "C:\\sb_cert_status_after.txt"
+    post_validation_script: "post_update_validation.ps1"
+    post_validation_result: "C:\\post_validation_result.txt"
+
+- name: "Capture the Secure Boot update stats before applying the update"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      powershell.exe -ExecutionPolicy ByPass -File {{ script_detect_sb_cert_status }} | Out-File -FilePath {{ sb_cert_status_before }}
+    win_execute_cmd_ignore_error: true
+
+# Apply the KEK and DB updates
+- name: "Turn on TPMTaskLog and set the AvailableUpdates registry value"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      reg add "HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\Servicing" /v "SecureBootUpdateTaskLog" /t REG_DWORD /d 1 /f;
+      reg add "HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot" /v "AvailableUpdates" /t REG_DWORD /d 0x5944 /f;
+      Start-ScheduledTask -TaskName "\Microsoft\Windows\PI\Secure-Boot-Update"
+
+- name: "Restart OS twice"
+  include_tasks: restart_os_twice.yml
+
+- name: "Capture the Secure Boot update stats after applying the update"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      powershell.exe -ExecutionPolicy ByPass -File {{ script_detect_sb_cert_status }} | Out-File -FilePath {{ sb_cert_status_after }}
+    win_execute_cmd_ignore_error: true
+
+- name: "Get the status files from guest OS to local machine"
+  include_tasks: ../utils/win_get_file.yml
+  vars:
+    win_get_file_src_path: "{{ item }}"
+    win_get_file_dst_path: "{{ current_test_log_folder }}"
+    win_get_file_ignore_error: true
+  loop:
+    - "{{ sb_cert_status_after }}"
+    - "{{ sb_cert_status_before }}"
+
+- name: "Transfer the post validation script to guest OS"
+  include_tasks: ../utils/win_copy_file_from_local.yml
+  vars:
+    src_path_local: "./{{ post_validation_script }}"
+    dest_path_remote: "C:\\"
+
+- name: "Run the post validation script"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      powershell.exe -ExecutionPolicy ByPass -File C:\\{{ post_validation_script }} | Out-File -FilePath {{ post_validation_result }}
+    win_execute_cmd_ignore_error: true
+
+- name: "Get the status files from guest OS to local machine"
+  include_tasks: ../utils/win_get_file.yml
+  vars:
+    win_get_file_src_path: "{{ post_validation_result }}"
+    win_get_file_dst_path: "{{ current_test_log_folder }}"
+
+- name: "Check the post validation result"
+  when:
+    - win_fetch_file.failed is defined
+    - not win_fetch_file.failed
+    - win_fetch_file.dest is defined
+    - win_fetch_file.dest
+  block:
+    - name: "Set the fact of file"
+      ansible.builtin.set_fact:
+        post_validation_file: "{{ win_fetch_file.dest }}"
+
+    - name: "Verify all checks passed in the log file"
+      ansible.builtin.assert:
+        that:
+          - "'RESULT: ALL CHECKS PASSED' in lookup('file', post_validation_file)"
+        success_msg: "RESULT: ALL CHECKS PASSED - Device is validated"
+        fail_msg: "RESULT: SOME CHECKS FAILED - Review the post validation result."
+
+- name: "Remove all the log files"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: "Remove-Item -Path {{ item }} -Force -ErrorAction SilentlyContinue"
+  loop:
+    - "{{ sb_cert_status_after }}"
+    - "{{ sb_cert_status_before }}"
+    - "{{ post_validation_result }}"

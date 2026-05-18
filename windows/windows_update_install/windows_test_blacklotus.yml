@@ -42,7 +42,7 @@
           include_tasks: ../../common/skip_test_case.yml
           vars:
             skip_msg: >-
-              Skip test case due to firmware is BISO which does not support secure boot.
+              Skip test case due to dbx already updated.
             skip_reason: "Skipped"
           when:
             - not win_powershell_cmd_output.failed
@@ -50,6 +50,12 @@
 
         - name: "Test black lotus"
           include_tasks: test_black_lotus.yml
+
+        - name: "Revert the secure boot status"
+          include_tasks: disable_secureboot.yml
+          when: >-
+            - secure_boot_changed is defined
+            - secure_boot_changed
 
         - name: "Get guest OS version after installing the .msu file"
           include_tasks: ../utils/win_get_os_version.yml
