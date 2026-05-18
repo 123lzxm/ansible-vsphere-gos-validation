@@ -1,15 +1,8 @@
 # Copyright 2024 VMware, Inc.
 # SPDX-License-Identifier: BSD-2-Clause
 ---
-- name: "Get VM boot info"
-  include_tasks: ../../common/vm_get_boot_info.yml
-- name: "Enable Secure boot"
-  include_tasks: ../secureboot_enable_disable/change_secureboot_config.yml
-  vars:
-    change_secureboot: 'enable'
-  when:
-    - vm_secureboot_enabled is defined
-    - not vm_secureboot_enabled | bool
+- name: "Check and enable secure boot"
+  include_tasks: enable_secureboot.yml
 
 #- name: "Apply DBX update according to KB5025885"
 #  include_tasks: apply_dbx_update_kb5025885.yml
