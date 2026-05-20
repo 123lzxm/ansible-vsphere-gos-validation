@@ -30,8 +30,8 @@
             (windows_nfs_msu_path is undefined or not windows_nfs_msu_path) or 
             (windows_nfs_share is undefined or not windows_nfs_share)
 
-        - name: "Install the online updates for guest OS"
-          include_tasks: install_online_updates.yml
+#        - name: "Install the online updates for guest OS"
+#          include_tasks: install_online_updates.yml
 
         - name: "Prepare the .msu file of type SSU"
           include_tasks: prepare_msu_file.yml
