@@ -1,0 +1,51 @@
+# Copyright 026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+# Collect the decoded PK, KEK, DB, DBX information from the guest OS
+#
+- name: windows_get_decoded_secureboot
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: "Test case block"
+      block:
+        - name: "Test setup"
+          include_tasks: ../setup/test_setup.yml
+          vars:
+            create_current_test_folder: true
+
+        - name: "Set the json file path for the decoded secure boot information"
+          ansible.builtin.set_fact:
+            secure_boot_decoded_json: "C:\\secure_boot_decoded.json"
+
+        # decoded is only supported from April-2026 Windows Updates
+        - name: "Collect the decoded secure boot info including PK/KEK/DB/DBX"
+          include_tasks: ../utils/win_execute_cmd.yml
+          vars:
+            win_powershell_cmd: |-
+              $stores = "pk","kek","db","dbx";
+              $data = foreach ($name in $stores) {
+                  try {
+                      $entries = Get-SecureBootUEFI -Name $name -Decoded -ErrorAction Stop;
+                  } catch {
+                      $entries = @();
+                  }
+                  [pscustomobject]@{
+                      Name    = $name
+                      Entries = $entries
+                  }
+              }
+              $json = $data | ConvertTo-Json -Depth 10;
+              Set-Content -Path "{{ secure_boot_decoded_json }}" -Value $json;
+
+        - name: "Get the decoded secure boot json file from guest OS to local machine"
+          include_tasks: ../utils/win_get_file.yml
+          vars:
+            win_get_file_src_path: "{{ secure_boot_decoded_json }}"
+            win_get_file_dst_path: "{{ current_test_log_folder }}"
+      rescue:
+        - name: "Test case failure"
+          include_tasks: ../../common/test_rescue.yml
+          vars:
+            exit_testing_when_fail: true

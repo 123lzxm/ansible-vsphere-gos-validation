@@ -10,3 +10,5 @@
 - import_playbook: uefi_db_test/uefi_db_test.yml
 - import_playbook: windows_update_install/windows_test_blacklotus.yml
 - import_playbook: windows_update_install/windows_kek_db_update.yml
+- import_playbook: windows_update_install/windows_get_decoded_secureboot.yml
+
