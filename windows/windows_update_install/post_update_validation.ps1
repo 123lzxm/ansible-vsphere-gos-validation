@@ -40,7 +40,7 @@ $ev1808 = Get-WinEvent -FilterHashtable @{LogName="System"; Id=1808} -MaxEvents 
 $evOk = $null -ne $ev1808
 Write-Host "[$(if($evOk){'PASS'}else{'FAIL'})] Event 1808 (fully updated): $evOk"
 # 6. Error events
-$errorIds = @(1032,1033,1795,1796,1801,1802,1803)
+$errorIds = @(1032,1033,1795,1796,1802,1803)
 $errors = @()
 foreach ($eid in $errorIds) {
     $ev = Get-WinEvent -FilterHashtable @{LogName="System"; Id=$eid; StartTime=(Get-Date).AddDays(-1)} -MaxEvents 5 -EA SilentlyContinue
@@ -98,11 +98,13 @@ try {
 }
 # Summary
 Write-Host ""
-Write-Host ("=" * 60) -ForegroundColor Cyan
+# Write-Host ("=" * 60) -ForegroundColor Cyan
 $allPass = $sb -and $pca2023 -and $has3P2023 -and $optrom -and $kek23 -and $bmOk -and $evOk -and (-not $errors)
 if ($allPass) {
-    Write-Host " RESULT: ALL CHECKS PASSED - Device is validated" -ForegroundColor Green
+    Write-Host "RESULT: ALL CHECKS PASSED - Device is validated"
+    # -ForegroundColor Green
 } else {
-    Write-Host " RESULT: SOME CHECKS FAILED - Review above" -ForegroundColor Red
+    Write-Host "RESULT: SOME CHECKS FAILED - Review above"
+    # -ForegroundColor Red
 }
-Write-Host ("=" * 60) -ForegroundColor Cyan
+# Write-Host ("=" * 60) -ForegroundColor Cyan

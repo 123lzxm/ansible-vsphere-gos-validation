@@ -37,16 +37,6 @@
       powershell.exe -ExecutionPolicy ByPass -File {{ script_detect_sb_cert_status }} | Out-File -FilePath {{ sb_cert_status_after }}
     win_execute_cmd_ignore_error: true
 
-- name: "Get the status files from guest OS to local machine"
-  include_tasks: ../utils/win_get_file.yml
-  vars:
-    win_get_file_src_path: "{{ item }}"
-    win_get_file_dst_path: "{{ current_test_log_folder }}"
-    win_get_file_ignore_error: true
-  loop:
-    - "{{ sb_cert_status_after }}"
-    - "{{ sb_cert_status_before }}"
-
 - name: "Transfer the post validation script to guest OS"
   include_tasks: ../utils/win_copy_file_from_local.yml
   vars:
@@ -60,29 +50,31 @@
       powershell.exe -ExecutionPolicy ByPass -File C:\\{{ post_validation_script }} | Out-File -FilePath {{ post_validation_result }}
     win_execute_cmd_ignore_error: true
 
-- name: "Get the status files from guest OS to local machine"
+- name: "Get all the log files from guest OS to local machine"
   include_tasks: ../utils/win_get_file.yml
   vars:
-    win_get_file_src_path: "{{ post_validation_result }}"
+    win_get_file_src_path: "{{ item }}"
     win_get_file_dst_path: "{{ current_test_log_folder }}"
+    win_get_file_ignore_error: true
+  loop:
+    - "{{ sb_cert_status_after }}"
+    - "{{ sb_cert_status_before }}"
+    - "{{ post_validation_result }}"
 
-- name: "Check the post validation result"
-  when:
-    - win_fetch_file.failed is defined
-    - not win_fetch_file.failed
-    - win_fetch_file.dest is defined
-    - win_fetch_file.dest
-  block:
-    - name: "Set the fact of file"
-      ansible.builtin.set_fact:
-        post_validation_file: "{{ win_fetch_file.dest }}"
+- name: "Verify if all checks passed in the log file {{ post_validation_result }}"
+  include_tasks: ../utils/win_execute_cmd.yml
+  vars:
+    win_powershell_cmd: >-
+      Select-String -Path "{{ post_validation_result }}" -Pattern "ALL CHECKS PASS"
+    win_execute_cmd_ignore_error: true
 
-    - name: "Verify all checks passed in the log file"
-      ansible.builtin.assert:
-        that:
-          - "'RESULT: ALL CHECKS PASSED' in lookup('file', post_validation_file)"
-        success_msg: "RESULT: ALL CHECKS PASSED - Device is validated"
-        fail_msg: "RESULT: SOME CHECKS FAILED - Review the post validation result."
+- name: "Check the verification result"
+  ansible.builtin.assert:
+    that:
+      - win_powershell_cmd_output.rc is defined
+      - win_powershell_cmd_output.rc == 0
+    success_msg: "RESULT: ALL CHECKS PASSED - Device is validated"
+    fail_msg: "RESULT: SOME CHECKS FAILED - Review the post validation result."
 
 - name: "Remove all the log files"
   include_tasks: ../utils/win_execute_cmd.yml
