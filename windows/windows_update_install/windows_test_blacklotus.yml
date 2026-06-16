@@ -53,9 +53,9 @@
 
         - name: "Revert the secure boot status"
           include_tasks: disable_secureboot.yml
-          when: >-
+          when:
             - secure_boot_changed is defined
-            - secure_boot_changed
+            - secure_boot_changed | bool
 
         - name: "Get guest OS version after installing the .msu file"
           include_tasks: ../utils/win_get_os_version.yml

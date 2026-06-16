@@ -23,7 +23,7 @@
 
         - name: "Revert the secure boot status"
           include_tasks: disable_secureboot.yml
-          when: >-
+          when:
             - secure_boot_changed is defined
             - secure_boot_changed
 
