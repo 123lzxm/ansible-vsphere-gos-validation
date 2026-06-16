@@ -5,6 +5,7 @@
   include_tasks: ../utils/win_shutdown_restart.yml
   vars:
     set_win_power_state: "restart"
+    win_reboot_timeout: 2700
 
 - name: "Pause 5 minutes"
   ansible.builtin.pause:
@@ -14,3 +15,4 @@
   include_tasks: ../utils/win_shutdown_restart.yml
   vars:
     set_win_power_state: "restart"
+    win_reboot_timeout: 2700
