@@ -1,0 +1,20 @@
+# Copyright 2021-2026 VMware, Inc.
+# SPDX-License-Identifier: BSD-2-Clause
+---
+# Description:
+#   This test case is used for checking guest OS customization (GOSC)
+# with DHCP network configuration. If VMware Tools is not installed
+# and running, the test result is 'Blocked'.
+# Note: VM guest OS customization requires vCenter server.
+#
+- name: gosc_sanity_dhcp
+  hosts: localhost
+  gather_facts: false
+  vars:
+    gosc_network_type: "dhcp"
+  tasks:
+    - name: "set fact of tesseract_is_installed"
+      ansible.builtin.set_fact:
+        tesseract_is_installed: true
+    - name: "Try the workaround when Windows desktop display check failed"
+      include_tasks: verify_desktop_display.yml
